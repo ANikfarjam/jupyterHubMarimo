@@ -1,0 +1,30 @@
+services:
+  hub:
+    build:
+      context: .
+      dockerfile: dockerfile
+    image: jhub-local:latest
+    container_name: jupyterhub
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # - ./srv/jupyterhub/jupyterhub_cookie_secret:/srv/jupyterhub/jupyterhub_cookie_secret:ro
+      - jupyterhub-user-data:/home/demo/work
+    environment:
+      - JUPYTERHUB_IP=0.0.0.0
+      - JUPYTERHUB_PORT=8000
+    command: jupyterhub -f /srv/jupyterhub/jupyterhub_config.py
+
+  culler:
+    image: jupyterhub/jupyterhub:4.1
+    depends_on: [hub]
+    restart: unless-stopped
+    environment:
+      JUPYTERHUB_API_TOKEN: "${CULL_API_TOKEN:-dev-token}"
+    command: >
+      python -m jupyterhub_idle_culler --timeout=3600 --cull-every=600
+      --url=http://hub:8081/hub/api
+
+volumes:
+  jupyterhub-user-data:
