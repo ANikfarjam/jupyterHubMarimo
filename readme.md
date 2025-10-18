@@ -1,22 +1,30 @@
-### JupytherHub and Mrimo
-This reposetory include instruction for setting up a jupyterhub server with a marimo proxy. 
 
-### Install the following packages
+### Architecture Diagram
 
-```
+![Architecture Diagram](./screenshots/Design%20Diagram.jpg)
+
+### User Creation Flow
+![User Creation Flow](./screenshots/usercreationflow.png)
+
+### Notebook Flow
+![NotebookFlow](./screenshots/NotebookFlow.png)
+
+# JupyterHub with Marimo Notebooks
+
+This repository provides a complete configuration to deploy a JupyterHub server with Marimo notebook support.
+
+## Prerequisites
+
+### Package Installation
+
+```bash
+# JupyterHub and components
 pip install jupyterhub notebook jupyterlab
-#istall just
+
+# Just command runner  
 pip install just
-#docker compose
+
+# Docker Compose
 sudo apt-get update
 sudo apt-get install docker-compose-plugin
-```
-
-Installing just run:
-```
-# to create the jhub docker image
-just config
-
-#to clear ports process
-just clean-ports
 

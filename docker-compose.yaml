@@ -3,28 +3,46 @@ services:
     build:
       context: .
       dockerfile: dockerfile
-    image: jhub-local:latest
-    container_name: jupyterhub
+    image: jhub-marimo:latest
+    container_name: jupyterhub-marimo
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8000:8000"  # JupyterHub port
+      - "9000:9000"  # FastAPI port
     volumes:
-      # - ./srv/jupyterhub/jupyterhub_cookie_secret:/srv/jupyterhub/jupyterhub_cookie_secret:ro
-      - jupyterhub-user-data:/home/demo/work
+      - jupyterhub-data:/home
+      - ./logs:/var/log/jupyterhub
     environment:
       - JUPYTERHUB_IP=0.0.0.0
       - JUPYTERHUB_PORT=8000
-    command: jupyterhub -f /srv/jupyterhub/jupyterhub_config.py
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/hub/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - jupyter-network
 
-  culler:
-    image: jupyterhub/jupyterhub:4.1
-    depends_on: [hub]
-    restart: unless-stopped
-    environment:
-      JUPYTERHUB_API_TOKEN: "${CULL_API_TOKEN:-dev-token}"
-    command: >
-      python -m jupyterhub_idle_culler --timeout=3600 --cull-every=600
-      --url=http://hub:8081/hub/api
+  # Optional: culler service for cleaning up idle servers
+  # culler:
+  #   image: jupyterhub/jupyterhub:4.1
+  #   container_name: jupyterhub-culler
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - hub
+  #   environment:
+  #     JUPYTERHUB_API_TOKEN: "culler-token-12345"
+  #   command: >
+  #     sh -c "sleep 30 && python -m jupyterhub_idle_culler 
+  #     --timeout=3600 --cull-every=600 
+  #     --url=http://hub:8081/hub/api"
+  #   networks:
+  #     - jupyter-network
 
 volumes:
-  jupyterhub-user-data:
+  jupyterhub-data:
+    driver: local
+
+networks:
+  jupyter-network:
+    driver: bridge

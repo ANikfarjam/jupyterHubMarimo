@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marimo JupyterHub Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.8;
+            font-size: 1.1em;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 0;
+            min-height: 600px;
+        }
+
+        .sidebar {
+            background: #34495e;
+            color: white;
+            padding: 30px;
+        }
+
+        .content-area {
+            background: #ecf0f1;
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        input, select, button {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        button:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.delete {
+            background: #e74c3c;
+        }
+
+        button.delete:hover {
+            background: #c0392b;
+        }
+
+        button.success {
+            background: #27ae60;
+        }
+
+        button.success:hover {
+            background: #219a52;
+        }
+
+        .user-list, .document-list {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 2px solid #bdc3c7;
+        }
+
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .list-item:last-child {
+            border-bottom: none;
+        }
+
+        .user-actions, .doc-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .action-btn {
+            padding: 5px 10px;
+            font-size: 12px;
+            width: auto;
+        }
+
+        .iframe-container {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #bdc3c7;
+            height: 500px;
+        }
+
+        #marimoFrame {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .status-message {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .status-success {
+            background: #d5f4e6;
+            color: #27ae60;
+            border: 1px solid #27ae60;
+        }
+
+        .status-error {
+            background: #fadbd8;
+            color: #e74c3c;
+            border: 1px solid #e74c3c;
+        }
+
+        .status-info {
+            background: #d6eaf8;
+            color: #3498db;
+            border: 1px solid #3498db;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .tab-buttons {
+            display: flex;
+            margin-bottom: 20px;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .tab-btn {
+            flex: 1;
+            background: #bdc3c7;
+            border: none;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn.active {
+            background: #3498db;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Marimo JupyterHub Manager</h1>
+            <p>Manage users and launch Marimo notebooks seamlessly</p>
+        </div>
+
+        <div class="main-content">
+            <div class="sidebar">
+                <div class="section">
+                    <h2 style="color: white;">User Management</h2>
+                    
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" placeholder="Enter username">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="documentName">Document Name</label>
+                        <input type="text" id="documentName" placeholder="Enter document name">
+                    </div>
+
+                    <button onclick="createUser()" class="success">Create User</button>
+                    <button onclick="spawnNotebook()" style="margin-top: 10px;">Spawn Notebook</button>
+                    
+                    <div class="form-group" style="margin-top: 20px;">
+                        <button onclick="refreshUsers()">Refresh Users</button>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2 style="color: white;">Current Users</h2>
+                    <div id="userList" class="user-list">
+                        <!-- Users will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-area">
+                <div class="tab-buttons">
+                    <button class="tab-btn active" onclick="showTab('notebookTab')">Marimo Notebook</button>
+                    <button class="tab-btn" onclick="showTab('documentsTab')">User Documents</button>
+                    <button class="tab-btn" onclick="showTab('logsTab')">Activity Logs</button>
+                </div>
+
+                <div id="notebookTab" class="tab-content active">
+                    <h2>Marimo Notebook</h2>
+                    <div id="statusMessage" class="status-message hidden"></div>
+                    <div class="iframe-container">
+                        <iframe id="marimoFrame" src="about:blank"></iframe>
+                    </div>
+                </div>
+
+                <div id="documentsTab" class="tab-content">
+                    <h2>User Documents</h2>
+                    <div class="form-group">
+                        <label for="selectedUser">Select User</label>
+                        <select id="selectedUser" onchange="loadUserDocuments()">
+                            <option value="">Select a user</option>
+                        </select>
+                    </div>
+                    <div id="documentList" class="document-list">
+                        <!-- Documents will be populated here -->
+                    </div>
+                </div>
+
+                <div id="logsTab" class="tab-content">
+                    <h2>Activity Logs</h2>
+                    <div id="activityLogs" class="document-list">
+                        <div class="list-item">
+                            <span>Welcome to Marimo JupyterHub Manager</span>
+                        </div>
+                    </div>
+                    <button onclick="clearLogs()" style="margin-top: 10px; width: auto;">Clear Logs</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/services/marimo-api';
+        let currentUsers = [];
+
+        // Tab management
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Display status message
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.textContent = message;
+            statusEl.className = `status-message status-${type}`;
+            statusEl.classList.remove('hidden');
+            
+            setTimeout(() => {
+                statusEl.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Add log entry
+        function addLog(message, type = 'info') {
+            const logsEl = document.getElementById('activityLogs');
+            const logEntry = document.createElement('div');
+            logEntry.className = 'list-item';
+            logEntry.innerHTML = `
+                <span style="color: ${type === 'error' ? '#e74c3c' : type === 'success' ? '#27ae60' : '#3498db'}">
+                    [${new Date().toLocaleTimeString()}] ${message}
+                </span>
+            `;
+            logsEl.insertBefore(logEntry, logsEl.firstChild);
+        }
+
+        // Clear logs
+        function clearLogs() {
+            document.getElementById('activityLogs').innerHTML = `
+                <div class="list-item">
+                    <span>Logs cleared</span>
+                </div>
+            `;
+            addLog('Logs cleared by user');
+        }
+
+        // Refresh users list
+        async function refreshUsers() {
+            try {
+                const response = await fetch(`${API_BASE}/users`);
+                if (!response.ok) throw new Error('Failed to fetch users');
+                
+                currentUsers = await response.json();
+                displayUsers(currentUsers);
+                updateUserDropdown(currentUsers);
+                addLog(`Refreshed users list. Found ${currentUsers.length} users`);
+            } catch (error) {
+                showStatus('Error fetching users: ' + error.message, 'error');
+                addLog('Error fetching users: ' + error.message, 'error');
+            }
+        }
+
+        // Display users in the list
+        function displayUsers(users) {
+            const userListEl = document.getElementById('userList');
+            userListEl.innerHTML = '';
+
+            if (users.length === 0) {
+                userListEl.innerHTML = '<div class="list-item">No users found</div>';
+                return;
+            }
+
+            users.forEach(user => {
+                const userItem = document.createElement('div');
+                userItem.className = 'list-item';
+                userItem.innerHTML = `
+                    <span>${user}</span>
+                    <div class="user-actions">
+                        <button class="action-btn success" onclick="spawnUserNotebook('${user}')">Spawn</button>
+                        <button class="action-btn delete" onclick="deleteUser('${user}')">Delete</button>
+                    </div>
+                `;
+                userListEl.appendChild(userItem);
+            });
+        }
+
+        // Update user dropdown for documents tab
+        function updateUserDropdown(users) {
+            const selectEl = document.getElementById('selectedUser');
+            selectEl.innerHTML = '<option value="">Select a user</option>';
+            
+            users.forEach(user => {
+                const option = document.createElement('option');
+                option.value = user;
+                option.textContent = user;
+                selectEl.appendChild(option);
+            });
+        }
+
+        // Create user
+        async function createUser() {
+            const username = document.getElementById('username').value.trim();
+            const docName = document.getElementById('documentName').value.trim();
+
+            if (!username) {
+                showStatus('Please enter a username', 'error');
+                return;
+            }
+
+            try {
+                showStatus('Creating user...', 'info');
+                addLog(`Creating user: ${username}`);
+
+                const response = await fetch(`${API_BASE}/users`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `username=${encodeURIComponent(username)}`
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(errorText);
+                }
+
+                // Create default document if name provided
+                if (docName) {
+                    await fetch(`${API_BASE}/documents`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: `username=${encodeURIComponent(username)}&document_name=${encodeURIComponent(docName)}`
+                    });
+                    addLog(`Created document '${docName}' for user '${username}'`, 'success');
+                }
+
+                showStatus(`User ${username} created successfully!`, 'success');
+                addLog(`User ${username} created successfully`, 'success');
+                
+                // Clear inputs and refresh list
+                document.getElementById('username').value = '';
+                document.getElementById('documentName').value = '';
+                await refreshUsers();
+
+            } catch (error) {
+                showStatus('Error creating user: ' + error.message, 'error');
+                addLog('Error creating user: ' + error.message, 'error');
+            }
+        }
+
+        // Delete user
+        async function deleteUser(username) {
+            if (!confirm(`Are you sure you want to delete user "${username}"?`)) {
+                return;
+            }
+
+            try {
+                showStatus(`Deleting user ${username}...`, 'info');
+                addLog(`Deleting user: ${username}`);
+
+                const response = await fetch(`${API_BASE}/users/${username}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to delete user');
+                }
+
+                showStatus(`User ${username} deleted successfully!`, 'success');
+                addLog(`User ${username} deleted successfully`, 'success');
+                await refreshUsers();
+
+            } catch (error) {
+                showStatus('Error deleting user: ' + error.message, 'error');
+                addLog('Error deleting user: ' + error.message, 'error');
+            }
+        }
+
+        // Spawn notebook for current user input
+        async function spawnNotebook() {
+            const username = document.getElementById('username').value.trim();
+            const docName = document.getElementById('documentName').value.trim();
+
+            if (!username) {
+                showStatus('Please enter a username', 'error');
+                return;
+            }
+
+            await spawnUserNotebook(username, docName || 'welcome_app.py');
+        }
+
+        // Spawn notebook for specific user
+        async function spawnUserNotebook(username, documentName = 'welcome_app.py') {
+            try {
+                showStatus(`Spawning notebook for ${username}...`, 'info');
+                addLog(`Spawning notebook for user: ${username}, document: ${documentName}`);
+
+                const response = await fetch(`${API_BASE}/spawn`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `username=${encodeURIComponent(username)}&document_name=${encodeURIComponent(documentName)}`
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(errorText);
+                }
+
+                const result = await response.json();
+                
+                // Load the marimo notebook in iframe
+                const iframe = document.getElementById('marimoFrame');
+                iframe.src = result.redirect;
+                
+                showStatus(`Notebook spawned successfully for ${username}!`, 'success');
+                addLog(`Notebook spawned for ${username}. Redirecting to: ${result.redirect}`, 'success');
+                
+                // Switch to notebook tab
+                showTab('notebookTab');
+
+            } catch (error) {
+                showStatus('Error spawning notebook: ' + error.message, 'error');
+                addLog('Error spawning notebook: ' + error.message, 'error');
+            }
+        }
+
+        // Load user documents
+        async function loadUserDocuments() {
+            const username = document.getElementById('selectedUser').value;
+            
+            if (!username) {
+                document.getElementById('documentList').innerHTML = '<div class="list-item">Select a user to view documents</div>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/documents?username=${encodeURIComponent(username)}`);
+                if (!response.ok) throw new Error('Failed to fetch documents');
+                
+                const documents = await response.json();
+                displayDocuments(username, documents);
+                addLog(`Loaded ${documents.length} documents for user: ${username}`);
+            } catch (error) {
+                document.getElementById('documentList').innerHTML = '<div class="list-item">Error loading documents</div>';
+                addLog('Error loading documents: ' + error.message, 'error');
+            }
+        }
+
+        // Display documents
+        function displayDocuments(username, documents) {
+            const docListEl = document.getElementById('documentList');
+            docListEl.innerHTML = '';
+
+            if (documents.length === 0) {
+                docListEl.innerHTML = '<div class="list-item">No documents found</div>';
+                return;
+            }
+
+            documents.forEach(doc => {
+                const docItem = document.createElement('div');
+                docItem.className = 'list-item';
+                docItem.innerHTML = `
+                    <span>${doc}</span>
+                    <div class="doc-actions">
+                        <button class="action-btn success" onclick="spawnUserNotebook('${username}', '${doc}')">Open</button>
+                        <button class="action-btn delete" onclick="deleteDocument('${username}', '${doc}')">Delete</button>
+                    </div>
+                `;
+                docListEl.appendChild(docItem);
+            });
+        }
+
+        // Delete document
+        async function deleteDocument(username, documentName) {
+            if (!confirm(`Are you sure you want to delete document "${documentName}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/documents`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `username=${encodeURIComponent(username)}&document_name=${encodeURIComponent(documentName)}`
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to delete document');
+                }
+
+                showStatus(`Document ${documentName} deleted successfully!`, 'success');
+                addLog(`Document ${documentName} deleted for user: ${username}`, 'success');
+                await loadUserDocuments();
+
+            } catch (error) {
+                showStatus('Error deleting document: ' + error.message, 'error');
+                addLog('Error deleting document: ' + error.message, 'error');
+            }
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            addLog('Application started');
+            refreshUsers();
+            
+            // Add keyboard shortcuts
+            document.addEventListener('keydown', function(e) {
+                if (e.ctrlKey && e.key === 'r') {
+                    e.preventDefault();
+                    refreshUsers();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
