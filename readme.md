@@ -1,3 +1,11 @@
+### Test result
+
+To test your server run
+```bach
+    just test-api <username> <document name with .py>
+```
+
+![Test](./screenshots/test.png)
 
 ### Architecture Diagram
 
@@ -27,4 +35,16 @@ pip install just
 # Docker Compose
 sudo apt-get update
 sudo apt-get install docker-compose-plugin
+```
 
+## Buld Server
+
+```bash
+just config
+```
+
+### Clean up ports
+
+```bash
+just clean-ports
+```
