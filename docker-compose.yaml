@@ -8,36 +8,36 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"  # JupyterHub port
-      - "9000:9000"  # FastAPI port
+      - "9000:9000"  # FastAPI (Marimo API) port
     volumes:
       - jupyterhub-data:/home
       - ./logs:/var/log/jupyterhub
+      - ./api:/srv/jupyterhub/api   # Mount your FastAPI code directory here
     environment:
+      # Basic JupyterHub setup
       - JUPYTERHUB_IP=0.0.0.0
       - JUPYTERHUB_PORT=8000
+
+      # Optional public URL override for frontend iFrame redirects
+      - PUBLIC_HUB_URL=http://localhost:8000
+
+      # These will be overwritten automatically by jupyterhub_config.py service env,
+      # but defining placeholders prevents missing-env errors during startup.
+      - HUB_URL=http://127.0.0.1:8000
+      - HUB_API_TOKEN=dummy-token-placeholder
+
+      # Optional logging or debug flags
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=DEBUG
+
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/hub/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+
     networks:
       - jupyter-network
-
-  # Optional: culler service for cleaning up idle servers
-  # culler:
-  #   image: jupyterhub/jupyterhub:4.1
-  #   container_name: jupyterhub-culler
-  #   restart: unless-stopped
-  #   depends_on:
-  #     - hub
-  #   environment:
-  #     JUPYTERHUB_API_TOKEN: "culler-token-12345"
-  #   command: >
-  #     sh -c "sleep 30 && python -m jupyterhub_idle_culler 
-  #     --timeout=3600 --cull-every=600 
-  #     --url=http://hub:8081/hub/api"
-  #   networks:
-  #     - jupyter-network
 
 volumes:
   jupyterhub-data:

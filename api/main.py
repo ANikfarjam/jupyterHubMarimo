@@ -9,10 +9,14 @@ from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
+from dotenv import load_dotenv
+import logging
+
+load_dotenv()
 
 # Environment variables
 HUB_URL = os.getenv("HUB_URL", "http://127.0.0.1:8081")
-HUB_API_TOKEN = os.getenv("HUB_API_TOKEN", "") 
+HUB_API_TOKEN = os.getenv("HUB_API_TOKEN") 
 FILES_ROOT = os.getenv("FILES_ROOT", "/home")
 APP_DIRNAME = os.getenv("APP_DIRNAME", "apps")
 DEFAULT_DOC = os.getenv("DEFAULT_DOC", "welcome_app.py")

@@ -37,6 +37,7 @@ RUN /opt/conda/bin/pip install --no-cache-dir \
       jupyter-server-proxy \
       jupyterlab \
       notebook \
+      python-dotenv \
       jupyterhub-idle-culler \
       fastapi \
       uvicorn \
@@ -56,12 +57,24 @@ RUN useradd -ms /bin/bash demo \
 RUN mkdir -p /srv/jupyterhub/api
 COPY /api/main.py /srv/jupyterhub/api/main.py
 
+# Generate API token at build time and set as environment variable
+RUN python3 -c "import secrets; print('HUB_API_TOKEN=' + secrets.token_hex(32))" > /etc/jupyterhub_env \
+ && chmod 644 /etc/jupyterhub_env
+
 # Create JupyterHub configuration
 RUN cat > /srv/jupyterhub/jupyterhub_config.py <<'EOF'
 import os
 import sys
 import pathlib
 from jupyterhub.spawner import LocalProcessSpawner
+from jupyterhub.utils import new_token
+
+# Load environment variables from file
+with open('/etc/jupyterhub_env', 'r') as f:
+    for line in f:
+        if '=' in line:
+            key, value = line.strip().split('=', 1)
+            os.environ[key] = value
 
 # Add the API directory to Python path
 sys.path.insert(0, '/srv/jupyterhub/api')
@@ -124,42 +137,32 @@ c.DummyAuthenticator.password = 'demo'
 c.JupyterHub.spawner_class = MarimoSpawner
 c.Spawner.default_url = '/'
 
-# Service configuration
-import secrets
-api_token = secrets.token_hex(32)
+# Get API token from environment
+_service_token = new_token()
 
 c.JupyterHub.services = [
     {
         "name": "marimo-api",
-        "url": "http://127.0.0.1:9000",
+        'url': 'http://127.0.0.1:9000',
+        'api_token': _service_token,
+        'oauth_no_confirm': True,   
         "command": [
             "/opt/conda/bin/python",
-            "-m", 
-            "uvicorn", 
-            "main:app", 
-            "--host", "0.0.0.0", 
+            "-m", "uvicorn", "main:app",
+            "--host", "0.0.0.0",
             "--port", "9000",
-            "--app-dir", "/srv/jupyterhub/api"
+            "--app-dir", "/srv/jupyterhub/api",
         ],
         "environment": {
-            "HUB_URL": "http://127.0.0.1:8081",
-            "HUB_API_TOKEN": api_token,
+            "HUB_API_TOKEN": _service_token,
             "FILES_ROOT": "/home",
             "APP_DIRNAME": "apps",
             "DEFAULT_DOC": "welcome_app.py",
-            "PUBLIC_HUB_URL": "http://localhost:8000"
+            "PUBLIC_HUB_URL": "http://localhost:8000",
         },
-        "oauth_no_confirm": True
+        "oauth_no_confirm": True,
     }
 ]
-
-# API tokens
-c.JupyterHub.api_tokens = {
-    api_token: "marimo-api-service",
-}
-
-# Store token in environment
-os.environ['HUB_API_TOKEN'] = api_token
 
 # Use conda Python for everything
 c.Spawner.cmd = ['/opt/conda/bin/jupyter-labhub']
@@ -196,5 +199,5 @@ RUN mkdir -p /home/demo/apps && chown -R demo:demo /home/demo
 # Expose ports
 EXPOSE 8000 9000
 
-# Start command
-CMD ["/opt/conda/bin/python", "-m", "jupyterhub", "-f", "/srv/jupyterhub/jupyterhub_config.py"]
+# Source environment variables and start command
+CMD ["/bin/bash", "-c", "set -a && source /etc/jupyterhub_env && set +a && /opt/conda/bin/python -m jupyterhub -f /srv/jupyterhub/jupyterhub_config.py"]

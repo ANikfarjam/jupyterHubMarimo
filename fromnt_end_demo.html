@@ -339,331 +339,300 @@
     </div>
 
     <script>
-        const API_BASE = 'http://localhost:8000/services/marimo-api';
+        const API_BASE = 'http://localhost:9000';
         let currentUsers = [];
 
-        // Tab management
-        function showTab(tabName) {
-            // Hide all tabs
+        // Tab management (robust: works with clicks AND programmatic calls)
+        function showTab(tabName, evt = null) {
             document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
+            tab.classList.remove('active');
             });
             document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('active');
+            btn.classList.remove('active');
             });
 
-            // Show selected tab
             document.getElementById(tabName).classList.add('active');
-            event.target.classList.add('active');
+
+            // If called from a real click event, highlight the clicked button
+            if (evt && evt.currentTarget) {
+            evt.currentTarget.classList.add('active');
+            } else {
+            // Otherwise, highlight the matching tab button by data-target
+            const btn = Array.from(document.querySelectorAll('.tab-btn'))
+                .find(b => (b.textContent || '').toLowerCase().includes(
+                tabName.replace('Tab','').toLowerCase()
+                ));
+            if (btn) btn.classList.add('active');
+            }
         }
 
-        // Display status message
+        // Display status message (unchanged)
         function showStatus(message, type = 'info') {
             const statusEl = document.getElementById('statusMessage');
             statusEl.textContent = message;
             statusEl.className = `status-message status-${type}`;
             statusEl.classList.remove('hidden');
-            
-            setTimeout(() => {
-                statusEl.classList.add('hidden');
-            }, 5000);
+            setTimeout(() => statusEl.classList.add('hidden'), 5000);
         }
 
-        // Add log entry
         function addLog(message, type = 'info') {
             const logsEl = document.getElementById('activityLogs');
             const logEntry = document.createElement('div');
             logEntry.className = 'list-item';
             logEntry.innerHTML = `
-                <span style="color: ${type === 'error' ? '#e74c3c' : type === 'success' ? '#27ae60' : '#3498db'}">
-                    [${new Date().toLocaleTimeString()}] ${message}
-                </span>
-            `;
+            <span style="color: ${type === 'error' ? '#e74c3c' : type === 'success' ? '#27ae60' : '#3498db'}">
+                [${new Date().toLocaleTimeString()}] ${message}
+            </span>`;
             logsEl.insertBefore(logEntry, logsEl.firstChild);
         }
 
-        // Clear logs
-        function clearLogs() {
-            document.getElementById('activityLogs').innerHTML = `
-                <div class="list-item">
-                    <span>Logs cleared</span>
-                </div>
-            `;
-            addLog('Logs cleared by user');
-        }
-
-        // Refresh users list
         async function refreshUsers() {
             try {
-                const response = await fetch(`${API_BASE}/users`);
-                if (!response.ok) throw new Error('Failed to fetch users');
-                
-                currentUsers = await response.json();
-                displayUsers(currentUsers);
-                updateUserDropdown(currentUsers);
-                addLog(`Refreshed users list. Found ${currentUsers.length} users`);
-            } catch (error) {
-                showStatus('Error fetching users: ' + error.message, 'error');
-                addLog('Error fetching users: ' + error.message, 'error');
+            const res = await fetch(`${API_BASE}/users`);
+            if (!res.ok) throw new Error('Failed to fetch users');
+            currentUsers = await res.json();
+            displayUsers(currentUsers);
+            updateUserDropdown(currentUsers);
+            addLog(`Refreshed users list. Found ${currentUsers.length} users`);
+            } catch (err) {
+            showStatus('Error fetching users: ' + err.message, 'error');
+            addLog('Error fetching users: ' + err.message, 'error');
             }
         }
 
-        // Display users in the list
         function displayUsers(users) {
             const userListEl = document.getElementById('userList');
-            userListEl.innerHTML = '';
-
-            if (users.length === 0) {
-                userListEl.innerHTML = '<div class="list-item">No users found</div>';
-                return;
-            }
+            userListEl.innerHTML = users.length
+            ? ''
+            : '<div class="list-item">No users found</div>';
 
             users.forEach(user => {
-                const userItem = document.createElement('div');
-                userItem.className = 'list-item';
-                userItem.innerHTML = `
-                    <span>${user}</span>
-                    <div class="user-actions">
-                        <button class="action-btn success" onclick="spawnUserNotebook('${user}')">Spawn</button>
-                        <button class="action-btn delete" onclick="deleteUser('${user}')">Delete</button>
-                    </div>
-                `;
-                userListEl.appendChild(userItem);
+            const userItem = document.createElement('div');
+            userItem.className = 'list-item';
+            userItem.innerHTML = `
+                <span>${user}</span>
+                <div class="user-actions">
+                <button class="action-btn success" onclick="spawnUserNotebook('${user}')">Spawn</button>
+                <button class="action-btn delete" onclick="deleteUser('${user}')">Delete</button>
+                </div>`;
+            userListEl.appendChild(userItem);
             });
         }
 
-        // Update user dropdown for documents tab
         function updateUserDropdown(users) {
             const selectEl = document.getElementById('selectedUser');
+            const current = selectEl.value;
             selectEl.innerHTML = '<option value="">Select a user</option>';
-            
             users.forEach(user => {
-                const option = document.createElement('option');
-                option.value = user;
-                option.textContent = user;
-                selectEl.appendChild(option);
+            const opt = document.createElement('option');
+            opt.value = user;
+            opt.textContent = user;
+            selectEl.appendChild(opt);
             });
+            // keep selection if still present
+            if (users.includes(current)) selectEl.value = current;
         }
 
-        // Create user
+        // Create user (with nicer error handling)
         async function createUser() {
             const username = document.getElementById('username').value.trim();
-            const docName = document.getElementById('documentName').value.trim();
-
+            const docName  = document.getElementById('documentName').value.trim();
             if (!username) {
-                showStatus('Please enter a username', 'error');
-                return;
+            showStatus('Please enter a username', 'error');
+            return;
+            }
+            try {
+            showStatus('Creating user...', 'info');
+            addLog(`Creating user: ${username}`);
+
+            const resp = await fetch(`${API_BASE}/users`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `username=${encodeURIComponent(username)}`
+            });
+
+            if (!resp.ok) {
+                const text = await resp.text();
+                let msg = text;
+                try { msg = JSON.parse(text).detail || text; } catch {}
+                throw new Error(msg);
             }
 
-            try {
-                showStatus('Creating user...', 'info');
-                addLog(`Creating user: ${username}`);
-
-                const response = await fetch(`${API_BASE}/users`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `username=${encodeURIComponent(username)}`
+            if (docName) {
+                await fetch(`${API_BASE}/documents`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `username=${encodeURIComponent(username)}&document_name=${encodeURIComponent(docName)}`
                 });
+                addLog(`Created document '${docName}' for user '${username}'`, 'success');
+            }
 
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(errorText);
-                }
+            showStatus(`User ${username} created successfully!`, 'success');
+            addLog(`User ${username} created successfully`, 'success');
+            document.getElementById('username').value = '';
+            document.getElementById('documentName').value = '';
+            await refreshUsers();
+            // preselect just-created user in Documents tab
+            const sel = document.getElementById('selectedUser');
+            sel.value = username;
 
-                // Create default document if name provided
-                if (docName) {
-                    await fetch(`${API_BASE}/documents`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        },
-                        body: `username=${encodeURIComponent(username)}&document_name=${encodeURIComponent(docName)}`
-                    });
-                    addLog(`Created document '${docName}' for user '${username}'`, 'success');
-                }
-
-                showStatus(`User ${username} created successfully!`, 'success');
-                addLog(`User ${username} created successfully`, 'success');
-                
-                // Clear inputs and refresh list
-                document.getElementById('username').value = '';
-                document.getElementById('documentName').value = '';
-                await refreshUsers();
-
-            } catch (error) {
-                showStatus('Error creating user: ' + error.message, 'error');
-                addLog('Error creating user: ' + error.message, 'error');
+            } catch (err) {
+            showStatus('Error creating user: ' + err.message, 'error');
+            addLog('Error creating user: ' + err.message, 'error');
             }
         }
 
-        // Delete user
         async function deleteUser(username) {
-            if (!confirm(`Are you sure you want to delete user "${username}"?`)) {
-                return;
-            }
-
+            if (!confirm(`Are you sure you want to delete user "${username}"?`)) return;
             try {
-                showStatus(`Deleting user ${username}...`, 'info');
-                addLog(`Deleting user: ${username}`);
+            showStatus(`Deleting user ${username}...`, 'info');
+            addLog(`Deleting user: ${username}`);
+            const res = await fetch(`${API_BASE}/users/${username}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Failed to delete user');
 
-                const response = await fetch(`${API_BASE}/users/${username}`, {
-                    method: 'DELETE'
-                });
+            showStatus(`User ${username} deleted successfully!`, 'success');
+            addLog(`User ${username} deleted successfully`, 'success');
+            await refreshUsers();
 
-                if (!response.ok) {
-                    throw new Error('Failed to delete user');
-                }
+            // clear iframe if it was showing this user's session
+            const iframe = document.getElementById('marimoFrame');
+            if (iframe.src.includes(`/user/${username}/proxy/`)) iframe.src = 'about:blank';
 
-                showStatus(`User ${username} deleted successfully!`, 'success');
-                addLog(`User ${username} deleted successfully`, 'success');
-                await refreshUsers();
-
-            } catch (error) {
-                showStatus('Error deleting user: ' + error.message, 'error');
-                addLog('Error deleting user: ' + error.message, 'error');
+            } catch (err) {
+            showStatus('Error deleting user: ' + err.message, 'error');
+            addLog('Error deleting user: ' + err.message, 'error');
             }
         }
 
-        // Spawn notebook for current user input
         async function spawnNotebook() {
             const username = document.getElementById('username').value.trim();
-            const docName = document.getElementById('documentName').value.trim();
-
+            const docName  = document.getElementById('documentName').value.trim();
             if (!username) {
-                showStatus('Please enter a username', 'error');
-                return;
+            showStatus('Please enter a username', 'error');
+            return;
             }
-
             await spawnUserNotebook(username, docName || 'welcome_app.py');
         }
 
-        // Spawn notebook for specific user
+        // Spawn + load iframe + “open in new tab”
         async function spawnUserNotebook(username, documentName = 'welcome_app.py') {
             try {
-                showStatus(`Spawning notebook for ${username}...`, 'info');
-                addLog(`Spawning notebook for user: ${username}, document: ${documentName}`);
+            showStatus(`Spawning notebook for ${username}...`, 'info');
+            addLog(`Spawning notebook for user: ${username}, document: ${documentName}`);
 
-                const response = await fetch(`${API_BASE}/spawn`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `username=${encodeURIComponent(username)}&document_name=${encodeURIComponent(documentName)}`
-                });
+            const resp = await fetch(`${API_BASE}/spawn`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `username=${encodeURIComponent(username)}&document_name=${encodeURIComponent(documentName)}`
+            });
 
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(errorText);
-                }
+            if (!resp.ok) {
+                const text = await resp.text();
+                let msg = text;
+                try { msg = JSON.parse(text).detail || text; } catch {}
+                throw new Error(msg);
+            }
 
-                const result = await response.json();
-                
-                // Load the marimo notebook in iframe
-                const iframe = document.getElementById('marimoFrame');
-                iframe.src = result.redirect;
-                
-                showStatus(`Notebook spawned successfully for ${username}!`, 'success');
-                addLog(`Notebook spawned for ${username}. Redirecting to: ${result.redirect}`, 'success');
-                
-                // Switch to notebook tab
-                showTab('notebookTab');
+            const result = await resp.json();
 
-            } catch (error) {
-                showStatus('Error spawning notebook: ' + error.message, 'error');
-                addLog('Error spawning notebook: ' + error.message, 'error');
+            // Load the marimo notebook in iframe
+            const iframe = document.getElementById('marimoFrame');
+            iframe.src = result.redirect;
+
+            showStatus(`Notebook spawned successfully for ${username}!`, 'success');
+            addLog(`Notebook spawned for ${username}. Redirecting to: ${result.redirect}`, 'success');
+
+            // Add/refresh an "Open in new tab" helper just below the iframe
+            let opener = document.getElementById('openNotebookLink');
+            if (!opener) {
+                opener = document.createElement('div');
+                opener.id = 'openNotebookLink';
+                opener.style.marginTop = '10px';
+                iframe.parentElement.after(opener);
+            }
+            opener.innerHTML = `<a href="${result.redirect}" target="_blank" rel="noopener noreferrer">Open notebook in a new tab</a>`;
+
+            // Switch to notebook tab safely
+            showTab('notebookTab');
+
+            // Optional: keep user dropdown synced
+            await refreshUsers();
+            const sel = document.getElementById('selectedUser');
+            sel.value = username;
+
+            } catch (err) {
+            showStatus('Error spawning notebook: ' + err.message, 'error');
+            addLog('Error spawning notebook: ' + err.message, 'error');
             }
         }
 
-        // Load user documents
         async function loadUserDocuments() {
             const username = document.getElementById('selectedUser').value;
-            
+            const docListEl = document.getElementById('documentList');
             if (!username) {
-                document.getElementById('documentList').innerHTML = '<div class="list-item">Select a user to view documents</div>';
-                return;
+            docListEl.innerHTML = '<div class="list-item">Select a user to view documents</div>';
+            return;
             }
-
             try {
-                const response = await fetch(`${API_BASE}/documents?username=${encodeURIComponent(username)}`);
-                if (!response.ok) throw new Error('Failed to fetch documents');
-                
-                const documents = await response.json();
-                displayDocuments(username, documents);
-                addLog(`Loaded ${documents.length} documents for user: ${username}`);
-            } catch (error) {
-                document.getElementById('documentList').innerHTML = '<div class="list-item">Error loading documents</div>';
-                addLog('Error loading documents: ' + error.message, 'error');
+            const res = await fetch(`${API_BASE}/documents?username=${encodeURIComponent(username)}`);
+            if (!res.ok) throw new Error('Failed to fetch documents');
+            const documents = await res.json();
+            displayDocuments(username, documents);
+            addLog(`Loaded ${documents.length} documents for user: ${username}`);
+            } catch (err) {
+            docListEl.innerHTML = '<div class="list-item">Error loading documents</div>';
+            addLog('Error loading documents: ' + err.message, 'error');
             }
         }
 
-        // Display documents
         function displayDocuments(username, documents) {
-            const docListEl = document.getElementById('documentList');
-            docListEl.innerHTML = '';
-
-            if (documents.length === 0) {
-                docListEl.innerHTML = '<div class="list-item">No documents found</div>';
-                return;
+            const list = document.getElementById('documentList');
+            list.innerHTML = '';
+            if (!documents.length) {
+            list.innerHTML = '<div class="list-item">No documents found</div>'; return;
             }
-
             documents.forEach(doc => {
-                const docItem = document.createElement('div');
-                docItem.className = 'list-item';
-                docItem.innerHTML = `
-                    <span>${doc}</span>
-                    <div class="doc-actions">
-                        <button class="action-btn success" onclick="spawnUserNotebook('${username}', '${doc}')">Open</button>
-                        <button class="action-btn delete" onclick="deleteDocument('${username}', '${doc}')">Delete</button>
-                    </div>
-                `;
-                docListEl.appendChild(docItem);
+            const row = document.createElement('div');
+            row.className = 'list-item';
+            row.innerHTML = `
+                <span>${doc}</span>
+                <div class="doc-actions">
+                <button class="action-btn success" onclick="spawnUserNotebook('${username}', '${doc}')">Open</button>
+                <button class="action-btn delete" onclick="deleteDocument('${username}', '${doc}')">Delete</button>
+                </div>`;
+            list.appendChild(row);
             });
         }
 
-        // Delete document
         async function deleteDocument(username, documentName) {
-            if (!confirm(`Are you sure you want to delete document "${documentName}"?`)) {
-                return;
-            }
-
+            if (!confirm(`Are you sure you want to delete document "${documentName}"?`)) return;
             try {
-                const response = await fetch(`${API_BASE}/documents`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `username=${encodeURIComponent(username)}&document_name=${encodeURIComponent(documentName)}`
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to delete document');
-                }
-
-                showStatus(`Document ${documentName} deleted successfully!`, 'success');
-                addLog(`Document ${documentName} deleted for user: ${username}`, 'success');
-                await loadUserDocuments();
-
-            } catch (error) {
-                showStatus('Error deleting document: ' + error.message, 'error');
-                addLog('Error deleting document: ' + error.message, 'error');
+            const res = await fetch(`${API_BASE}/documents`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `username=${encodeURIComponent(username)}&document_name=${encodeURIComponent(documentName)}`
+            });
+            if (!res.ok) throw new Error('Failed to delete document');
+            showStatus(`Document ${documentName} deleted successfully!`, 'success');
+            addLog(`Document ${documentName} deleted for user: ${username}`, 'success');
+            await loadUserDocuments();
+            } catch (err) {
+            showStatus('Error deleting document: ' + err.message, 'error');
+            addLog('Error deleting document: ' + err.message, 'error');
             }
         }
 
-        // Initialize the application
         document.addEventListener('DOMContentLoaded', function() {
             addLog('Application started');
             refreshUsers();
-            
-            // Add keyboard shortcuts
             document.addEventListener('keydown', function(e) {
-                if (e.ctrlKey && e.key === 'r') {
-                    e.preventDefault();
-                    refreshUsers();
-                }
+            if (e.ctrlKey && e.key === 'r') {
+                e.preventDefault();
+                refreshUsers();
+            }
             });
         });
     </script>
+
 </body>
 </html>
