@@ -3,28 +3,46 @@ services:
     build:
       context: .
       dockerfile: dockerfile
-    image: jhub-local:latest
-    container_name: jupyterhub
+    image: jhub-marimo:latest
+    container_name: jupyterhub-marimo
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8000:8000"  # JupyterHub port
+      - "9000:9000"  # FastAPI (Marimo API) port
     volumes:
-      # - ./srv/jupyterhub/jupyterhub_cookie_secret:/srv/jupyterhub/jupyterhub_cookie_secret:ro
-      - jupyterhub-user-data:/home/demo/work
+      - jupyterhub-data:/home
+      - ./logs:/var/log/jupyterhub
+      - ./api:/srv/jupyterhub/api   # Mount your FastAPI code directory here
     environment:
+      # Basic JupyterHub setup
       - JUPYTERHUB_IP=0.0.0.0
       - JUPYTERHUB_PORT=8000
-    command: jupyterhub -f /srv/jupyterhub/jupyterhub_config.py
 
-  culler:
-    image: jupyterhub/jupyterhub:4.1
-    depends_on: [hub]
-    restart: unless-stopped
-    environment:
-      JUPYTERHUB_API_TOKEN: "${CULL_API_TOKEN:-dev-token}"
-    command: >
-      python -m jupyterhub_idle_culler --timeout=3600 --cull-every=600
-      --url=http://hub:8081/hub/api
+      # Optional public URL override for frontend iFrame redirects
+      - PUBLIC_HUB_URL=http://localhost:8000
+
+      # These will be overwritten automatically by jupyterhub_config.py service env,
+      # but defining placeholders prevents missing-env errors during startup.
+      - HUB_URL=http://127.0.0.1:8000
+      - HUB_API_TOKEN=dummy-token-placeholder
+
+      # Optional logging or debug flags
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=DEBUG
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/hub/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+    networks:
+      - jupyter-network
 
 volumes:
-  jupyterhub-user-data:
+  jupyterhub-data:
+    driver: local
+
+networks:
+  jupyter-network:
+    driver: bridge
