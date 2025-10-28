@@ -8,33 +8,13 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"  # JupyterHub port
-      - "9000:9000"  # FastAPI (Marimo API) port
+      - "9000:9000"  # FastAPI port
     volumes:
       - jupyterhub-data:/home
       - ./logs:/var/log/jupyterhub
-      - ./api:/srv/jupyterhub/api   # Mount your FastAPI code directory here
-    environment:
-      # Basic JupyterHub setup
-      - JUPYTERHUB_IP=0.0.0.0
-      - JUPYTERHUB_PORT=8000
-
-      # Optional public URL override for frontend iFrame redirects
-      - PUBLIC_HUB_URL=http://localhost:8000
-
-      # These will be overwritten automatically by jupyterhub_config.py service env,
-      # but defining placeholders prevents missing-env errors during startup.
-      - HUB_URL=http://127.0.0.1:8000
-      - HUB_API_TOKEN=dummy-token-placeholder
-
-      # Optional logging or debug flags
-      - PYTHONUNBUFFERED=1
-      - LOG_LEVEL=DEBUG
-
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/hub/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - ./api:/srv/jupyterhub/api
+    env_file:
+      - .env
 
     networks:
       - jupyter-network

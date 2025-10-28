@@ -6,4 +6,6 @@ __pycache__/
 defualtConfig.py
 srv/
 logs/
+.env
+.DS_Store
 
