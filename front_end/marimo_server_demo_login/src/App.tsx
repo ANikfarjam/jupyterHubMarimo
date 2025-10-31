@@ -1,8 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import CardDemo from '@/components/common_components/LogIn';
 import Dashboard from '@/components/common_components/Dashboard';
-
+import LandingPage from './components/common_components/LandingPage';
+import CardDemo from './components/common_components/LogIn';
 // Protected Route component
 
 function App() {
@@ -13,7 +13,7 @@ function App() {
             <Route 
               path="/" 
               element={
-                    <CardDemo />
+                    <LandingPage />
               } 
             />
             <Route 

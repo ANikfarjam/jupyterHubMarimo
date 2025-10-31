@@ -13,11 +13,11 @@ const audience = import.meta.env.VITE_AUTH0_AUDIENCE as string;
 const root = createRoot(container);
 root.render(
   <Auth0Provider
-    domain={domain}
-    clientId={clientId}
+    domain={domain || "dev-mtmjc4rwzjq4eryf.us.auth0.com"}
+    clientId={clientId || "JGn9DHgfMZSCuANjjiHH8dGA3d9ZnFiW"}
     authorizationParams={{
       redirect_uri: `${window.location.origin}/dashboard`,
-      audience: audience,
+      audience: "https://dev-mtmjc4rwzjq4eryf.us.auth0.com/api/v2/",
       scope: "read:current_user update:current_user_metadata"
     }}
   >
