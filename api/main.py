@@ -235,6 +235,76 @@ async def create_document(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating document: {str(e)}")
 
+# getting existing documents from the spawned server
+@app.get("/documents")
+async def list_documents(authorization: Optional[str] = Header(None)):
+    """List all Marimo documents for the authenticated user"""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+    
+    token = authorization.split(" ", 1)[1].strip()
+    username = await get_username_from_token(token)
+    
+    try:
+        await _ensure_user_exists(username)
+        
+        # Get the user's apps directory
+        apps_dir = _app_path(username, "")
+        
+        # List all Python files in the apps directory
+        documents = []
+        if apps_dir.exists():
+            for file_path in apps_dir.iterdir():
+                if file_path.is_file() and file_path.suffix == '.py':
+                    documents.append({
+                        "name": file_path.name,
+                        "path": str(file_path),
+                        "size": file_path.stat().st_size,
+                        "modified": file_path.stat().st_mtime
+                    })
+        
+        return {
+            "ok": True,
+            "documents": documents,
+            "message": f"Found {len(documents)} documents for user {username}"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error listing documents: {str(e)}")
+
+@app.get("/documents/{document_name}")
+async def get_document(
+    document_name: str,
+    authorization: Optional[str] = Header(None)
+):
+    """Get the content of a specific document"""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+    
+    token = authorization.split(" ", 1)[1].strip()
+    username = await get_username_from_token(token)
+    
+    try:
+        # Security: Prevent path traversal
+        if ".." in document_name or "/" in document_name:
+            raise HTTPException(status_code=400, detail="Invalid document name")
+        
+        p = _app_path(username, document_name)
+        
+        if not p.exists():
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        content = p.read_text()
+        
+        return {
+            "ok": True,
+            "name": document_name,
+            "content": content,
+            "path": str(p)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading document: {str(e)}")
 # Additional management endpoints (protected with HUB_API_TOKEN)
 @app.get("/admin/users")
 async def list_users(x_api_token: Optional[str] = Header(None)):
