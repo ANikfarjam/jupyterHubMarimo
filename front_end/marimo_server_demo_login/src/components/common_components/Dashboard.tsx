@@ -20,7 +20,8 @@ import {
   TableRow,
   TableCell,
   TableCaption,
-}from "@/components/ui/table"
+}from "@/components/ui/table";
+import ServersDataTable from "./DataTable";
 
 type MarimoDocument = { filename: string };
 // Shape returned by the listDocuments API
@@ -243,6 +244,9 @@ export default function Dashboard() {
           </Button>
         </div>
       </header>
+      <div>
+        <ServersDataTable></ServersDataTable>
+      </div>
 
     </div>
   );
