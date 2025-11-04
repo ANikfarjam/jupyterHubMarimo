@@ -19,7 +19,12 @@ export default function LandingPage() {
   const handleLogin = async () => {
     try {
       setLoginError(null);
-      await loginWithRedirect();
+      await loginWithRedirect({
+        authorizationParams: {
+          audience: "https://dev-mtmjc4rwzjq4eryf.us.auth0.com/api/v2/",
+          scope: "openid profile email read:current_user offline_access",
+        },
+      });
     } catch (error) {
       console.error("Login error:", error);
       setLoginError("Failed to redirect to login. Please check your Auth0 configuration.");

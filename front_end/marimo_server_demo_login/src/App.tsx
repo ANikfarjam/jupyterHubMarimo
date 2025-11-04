@@ -2,7 +2,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from '@/components/common_components/Dashboard';
 import LandingPage from './components/common_components/LandingPage';
-import CardDemo from './components/common_components/LogIn';
+import ProtectedRoute from './components/ProtectRoute';
+
 // Protected Route component
 
 function App() {
@@ -19,11 +20,11 @@ function App() {
             <Route 
               path="/dashboard" 
               element={
+                <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
               } 
             />
-            {/* Catch all route - redirect to appropriate page based on auth status */}
-            {/* <Route path="*" element={<Navigate to="/" replace />} /> */}
           </Routes>
         </div>
       </Router>

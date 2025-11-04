@@ -24,16 +24,16 @@ if os.path.exists('/etc/jupyterhub_env'):
 
 # Ensure HUB_API_TOKEN exists. If its still missing at runtime, generate one and
 # append it to /etc/jupyterhub_env so subsequent restarts can reuse it.
-if not os.environ.get('HUB_API_TOKEN'):
-    try:
-        token = new_token()
-        os.environ['HUB_API_TOKEN'] = token
-        # Append to file so the token is persisted in the file for future runs
-        with open('/etc/jupyterhub_env', 'a') as f:
-            f.write(f'HUB_API_TOKEN={token}\n')
-    except Exception:
-        # If token generation or file write fails, fall back to runtime-only value
-        pass
+# if not os.environ.get('HUB_API_TOKEN'):
+#     try:
+#         token = new_token()
+#         os.environ['HUB_API_TOKEN'] = token
+#         # Append to file so the token is persisted in the file for future runs
+#         with open('/etc/jupyterhub_env', 'a') as f:
+#             f.write(f'HUB_API_TOKEN={token}\n')
+#     except Exception:
+#         # If token generation or file write fails, fall back to runtime-only value
+#         pass
 
 # Add the API directory to Python path
 sys.path.insert(0, '/srv/jupyterhub/api')
@@ -163,6 +163,8 @@ c.JupyterHub.services = [
             "APP_DIRNAME": "apps",
             "DEFAULT_DOC": "welcome_app.py",
             "PUBLIC_HUB_URL": "http://localhost:8000",
+            "AUTH_DOMAIN": os.environ.get("AUTH_DOMAIN"),
+            "AUTH_AUDIENCE": os.environ.get("AUTH_AUDIENCE"),
         },
     }
 ]

@@ -4,73 +4,74 @@ import {
   createConfig,
   type OptionsLegacyParser,
 } from "@hey-api/client-axios";
-import { createDocument, spawnResponse,DocumentInfo, ListDocumentsResponse,GetDocumentResponse  } from "./types";
+// Note: specific response types live in `./types` but are not required in this module
+// because request helper functions keep response typing separate from request options.
 
-export const client = createClient(createConfig());
+export const client = createClient(createConfig(
+  {baseURL: "http://localhost:9000"},
+));
+
+// Base request options for client calls (do NOT mix in response shape)
+// Keep this independent from the response generic so callers can pass only
+// request-related properties (headers, params, etc.) plus `userToken`.
+type BaseRequestOptions = Omit<OptionsLegacyParser<any, false>, "url"> & {
+    userToken: string;
+};
 
 // For spawning user server
-export const spawnServer = <ThrowOnError extends boolean = false>(
-    options: OptionsLegacyParser<spawnResponse, ThrowOnError> & {
-        userToken: string;
-    }
+export const spawnServer = (
+    options: BaseRequestOptions
 ) => {
-    // Pull out fields we don't want sent as part of the axios request config
     const { client: optClient, userToken, ...rest } = options as any;
+    const usedClient = (optClient ?? client) as any;
 
-        const usedClient = (optClient ?? client) as any;
+    const headers = {
+        ...(rest.headers ?? {}),
+        Authorization: `Bearer ${userToken}`,
+    };
 
-        const headers = {
-            ...(rest.headers ?? {}),
-            Authorization: `Bearer ${userToken}`,
-        };
-
-            return usedClient.post({
-            ...rest,
-            url: "http://localhost:8000/spawn",
-            headers,
-        });
+    return usedClient.post({
+        ...rest,
+        url: "/spawn",
+        headers,
+    });
 };
 
 // For creating documents (uses /documents endpoint with Form data)
-export const createJhubDocument = <ThrowOnError extends boolean = false>(
-    options: OptionsLegacyParser<any, ThrowOnError> & {
-        userToken: string;
+export const createJhubDocument = (
+    options: BaseRequestOptions & {
         documentName: string;
     }
 ) => {
     const { client: optClient, userToken, documentName, ...rest } = options as any;
-
     const formData = new FormData();
     formData.append("document_name", documentName);
 
-    // Build headers but don't override Content-Type when using FormData; the browser sets it
-        const providedHeaders = rest.headers ?? {};
-        // Make a shallow copy and ensure Content-Type is removed so browser sets it for FormData
-        const headersCopy: Record<string, unknown> = { ...providedHeaders };
-        delete (headersCopy as any)["Content-Type"];
-        const headers = {
-            ...headersCopy,
-            Authorization: `Bearer ${userToken}`,
-        };
+    const headers = {
+        ...(rest.headers ?? {}),
+        Authorization: `Bearer ${userToken}`,
+    };
 
-        const usedClient = (optClient ?? client) as any;
+    // Proper debug logging
+    console.log("Making CREATE DOCUMENT request to: http://localhost:9000/documents");
+    console.log("Document name:", documentName);
+    console.log("Headers:", headers);
 
-            return usedClient.post({
-            ...rest,
-            url: "http://localhost:8000/documents",
-            headers,
-            data: formData,
-        });
+    const usedClient = (optClient ?? client) as any;
+
+    return usedClient.post({
+        ...rest,
+        url: "/documents",
+        headers,
+        data: formData,
+    });
 };
 
 // For listing all documents
-export const listDocuments = <ThrowOnError extends boolean = false>(
-    options: OptionsLegacyParser<ListDocumentsResponse, ThrowOnError> & {
-        userToken: string;
-    }
+export const listDocuments = (
+    options: BaseRequestOptions
 ) => {
     const { client: optClient, userToken, ...rest } = options as any;
-
     const usedClient = (optClient ?? client) as any;
 
     const headers = {
@@ -80,20 +81,18 @@ export const listDocuments = <ThrowOnError extends boolean = false>(
 
     return usedClient.get({
         ...rest,
-        url: "http://localhost:8000/documents",
+        url: "/documents",
         headers,
     });
 };
 
 // For getting a specific document
-export const getDocument = <ThrowOnError extends boolean = false>(
-    options: OptionsLegacyParser<GetDocumentResponse, ThrowOnError> & {
-        userToken: string;
+export const getDocument = (
+    options: BaseRequestOptions & {
         documentName: string;
     }
 ) => {
     const { client: optClient, userToken, documentName, ...rest } = options as any;
-
     const usedClient = (optClient ?? client) as any;
 
     const headers = {
@@ -103,7 +102,109 @@ export const getDocument = <ThrowOnError extends boolean = false>(
 
     return usedClient.get({
         ...rest,
-        url: `http://localhost:8000/documents/${encodeURIComponent(documentName)}`,
+        url: `/documents/${encodeURIComponent(documentName)}`,
         headers,
     });
+};
+
+// Add delete document method for completeness
+export const deleteDocument = (
+    options: BaseRequestOptions & {
+        documentName: string;
+    }
+) => {
+    const { client: optClient, userToken, documentName, ...rest } = options as any;
+    const usedClient = (optClient ?? client) as any;
+
+    const headers = {
+        ...(rest.headers ?? {}),
+        Authorization: `Bearer ${userToken}`,
+    };
+
+    return usedClient.delete({
+        ...rest,
+        url: `/documents/${encodeURIComponent(documentName)}`,
+        headers,
+    });
+};
+
+
+// Get all servers for authenticated user
+export const getMyServers = (
+  options: BaseRequestOptions
+) => {
+  const { client: optClient, userToken, ...rest } = options as any;
+  const usedClient = (optClient ?? client) as any;
+
+  const headers = {
+    ...(rest.headers ?? {}),
+    Authorization: `Bearer ${userToken}`,
+  };
+
+  return usedClient.get({
+    ...rest,
+    url: "/my-servers",
+    headers,
+  });
+};
+
+// Check server status for authenticated user
+export const checkMyServersStatus = (
+  options: BaseRequestOptions
+) => {
+  const { client: optClient, userToken, ...rest } = options as any;
+  const usedClient = (optClient ?? client) as any;
+
+  const headers = {
+    ...(rest.headers ?? {}),
+    Authorization: `Bearer ${userToken}`,
+  };
+
+  return usedClient.get({
+    ...rest,
+    url: "/my-servers/status",
+    headers,
+  });
+};
+
+// Admin endpoints (require HUB_API_TOKEN)
+export const getUserServers = (
+  options: BaseRequestOptions & {
+    username: string;
+  }
+) => {
+  const { client: optClient, userToken, username, ...rest } = options as any;
+  const usedClient = (optClient ?? client) as any;
+
+  const headers = {
+    ...(rest.headers ?? {}),
+    "X-API-Token": userToken, // Using HUB_API_TOKEN for admin endpoints
+  };
+
+  return usedClient.get({
+    ...rest,
+    url: `/users/${encodeURIComponent(username)}/servers`,
+    headers,
+  });
+};
+
+export const getUserServerStatus = (
+  options: BaseRequestOptions & {
+    username: string;
+    serverName: string;
+  }
+) => {
+  const { client: optClient, userToken, username, serverName, ...rest } = options as any;
+  const usedClient = (optClient ?? client) as any;
+
+  const headers = {
+    ...(rest.headers ?? {}),
+    "X-API-Token": userToken, // Using HUB_API_TOKEN for admin endpoints
+  };
+
+  return usedClient.get({
+    ...rest,
+    url: `/users/${encodeURIComponent(username)}/servers/${encodeURIComponent(serverName)}`,
+    headers,
+  });
 };
