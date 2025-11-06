@@ -39,6 +39,7 @@ RUN /opt/conda/bin/pip install --no-cache-dir \
       pyjwt[crypto] \
       notebook \
       python-dotenv \
+      python-multipart \
       jupyterhub-idle-culler \
       fastapi \
       python-jose[cryptography] \

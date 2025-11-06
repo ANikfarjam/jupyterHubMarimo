@@ -44,20 +44,23 @@ export const createJhubDocument = (
     }
 ) => {
     const { client: optClient, userToken, documentName, ...rest } = options as any;
-    const formData = new FormData();
+    const usedClient = (optClient ?? client) as any;
+
+    console.log("Making CREATE DOCUMENT request to: http://localhost:9000/documents");
+    console.log("Document name:", documentName);
+
+    // Use URLSearchParams for application/x-www-form-urlencoded
+    const formData = new URLSearchParams();
     formData.append("document_name", documentName);
 
     const headers = {
         ...(rest.headers ?? {}),
         Authorization: `Bearer ${userToken}`,
+        "Content-Type": "application/x-www-form-urlencoded",
     };
 
-    // Proper debug logging
-    console.log("Making CREATE DOCUMENT request to: http://localhost:9000/documents");
-    console.log("Document name:", documentName);
     console.log("Headers:", headers);
-
-    const usedClient = (optClient ?? client) as any;
+    console.log("Form data:", formData.toString());
 
     return usedClient.post({
         ...rest,
@@ -66,6 +69,7 @@ export const createJhubDocument = (
         data: formData,
     });
 };
+
 
 // For listing all documents
 export const listDocuments = (

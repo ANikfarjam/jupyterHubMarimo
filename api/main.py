@@ -16,6 +16,7 @@ from fastapi.security import HTTPBearer
 from pydantic import BaseModel
 import json
 from typing import Dict, Any
+import logging 
 
 HUB_URL = os.getenv("HUB_URL", "http://127.0.0.1:8000")
 HUB_API_TOKEN = os.getenv("HUB_API_TOKEN") 
@@ -25,7 +26,7 @@ DEFAULT_DOC = os.getenv("DEFAULT_DOC", "welcome_app.py")
 AUTH0_DOMAIN = os.getenv("AUTH_DOMAIN")  # Add this
 
 app = FastAPI(title="marimo-api", version="1.0.0")
-
+log = logging.getLogger(__name__)
 
 app.add_middleware(
     CORSMiddleware,
@@ -175,7 +176,7 @@ async def get_username_from_token(token: str) -> str:
                 claims.get("preferred_username") or 
                 claims.get("nickname") or 
                 claims.get("sub"))
-    
+    print(f"Debug: all token claims: {claims}")
     if not username:
         raise HTTPException(status_code=400, detail="No usable username in token")
     
@@ -211,7 +212,7 @@ async def spawn_user_server(authorization: Optional[str] = Header(None)):
     """
     Spawn a JupyterHub server for the user (no document creation)
     """
-    print("DEBUG: /spawn endpoint called")
+    log.info("DEBUG: /spawn endpoint called")
     
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Missing bearer token")
@@ -221,15 +222,15 @@ async def spawn_user_server(authorization: Optional[str] = Header(None)):
     try:
         # Verify Auth0 token and get username
         username = await get_username_from_token(token)
-        print(f"DEBUG: Spawning server for user: {username}")
+        log.info(f"DEBUG: Spawning server for user: {username}")
         
         # Ensure user exists in JupyterHub
         await _ensure_user_exists(username)
-        print(f"DEBUG: User {username} ensured in JupyterHub")
+        log.info(f"DEBUG: User {username} ensured in JupyterHub")
         
         # Ensure user directories exist
         await _ensure_user_directory(username)
-        print(f"DEBUG: Directories created for user {username}")
+        log.info(f"DEBUG: Directories created for user {username}")
         
         # Start the JupyterHub server
         async with httpx.AsyncClient() as client:
@@ -240,9 +241,30 @@ async def spawn_user_server(authorization: Optional[str] = Header(None)):
             )
             
             if spawn_response.status_code in [202, 201]:
-                print(f"DEBUG: Server spawn initiated for {username}")
+                log.info(f"DEBUG: Server spawn initiated for {username}")
                 # Wait a bit for server to start
-                await asyncio.sleep(2)
+                max_wait = 60
+                poll_interval = 3
+                waited = 0
+
+                while waited < max_wait:
+                    await asyncio.sleep(poll_interval)
+                    waited += poll_interval
+                    
+                    # Check server status
+                    status_response = await client.get(
+                        f"{HUB_URL}/hub/api/users/{username}",
+                        headers=_hub_headers()
+                    )
+                    
+                    if status_response.status_code == 200:
+                        user_data = status_response.json()
+                        server_info = user_data.get('servers', {}).get('')
+                        
+                        if server_info and server_info.get('ready'):
+                            # Server is ready!
+                            break
+
                 
                 # Check server status
                 server_status = await client.get(
@@ -256,7 +278,7 @@ async def spawn_user_server(authorization: Optional[str] = Header(None)):
                     
                     if server_info and server_info.get('ready'):
                         server_url = server_info.get('url', f"/hub/user/{quote(username)}/")
-                        print(f"DEBUG: Server ready at: {server_url}")
+                        log.info(f"DEBUG: Server ready at: {server_url}")
                         
                         return JSONResponse({
                             "ok": True, 
@@ -278,7 +300,7 @@ async def spawn_user_server(authorization: Optional[str] = Header(None)):
                     raise HTTPException(status_code=500, detail="Failed to check server status")
             else:
                 error_detail = spawn_response.text
-                print(f"DEBUG: Spawn failed with status {spawn_response.status_code}: {error_detail}")
+                log.info(f"DEBUG: Spawn failed with status {spawn_response.status_code}: {error_detail}")
                 raise HTTPException(
                     status_code=spawn_response.status_code, 
                     detail=f"Failed to spawn server: {error_detail}"
@@ -287,7 +309,7 @@ async def spawn_user_server(authorization: Optional[str] = Header(None)):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"DEBUG: Unexpected error in spawn: {str(e)}")
+        log.info(f"DEBUG: Unexpected error in spawn: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error spawning server: {str(e)}")
     
 
@@ -534,12 +556,14 @@ async def create_user(authorization: Optional[str] = Header(None)):
 
 @app.post("/documents")
 async def create_document(
-    authorization: Optional[str] = Header(None),
-    document_name: str = Form(...)
+    document_name: str = Form(...),
+    authorization: Optional[str] = Header(None)
 ):
     """Create a new Marimo document - requires running server"""
     print("DEBUG: /documents endpoint called")
-    
+    print(f"DEBUG: Received document_name form field: {document_name}")
+    print(f"DEBUG: Authorization header: {authorization[:50] if authorization else 'None'}...")
+
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Missing bearer token")
     
@@ -567,12 +591,12 @@ async def create_document(
         # Create the document
         p = _app_path(username, document_name)
         _ensure_marimo_file(p)
-        
+
         print(f"DEBUG: Document created at: {p}")
-        
+
         return {
-            "ok": True, 
-            "path": str(p), 
+            "ok": True,
+            "path": str(p),
             "message": f"Document {document_name} created for user {username}",
             "server_running": True
         }

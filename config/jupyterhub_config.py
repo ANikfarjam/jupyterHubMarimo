@@ -106,29 +106,85 @@ class MarimoSpawner(LocalProcessSpawner):
         """Helper function to get user home directory"""
         return pathlib.Path("/home") / username
 
+    def get_args(self):
+        """Build the command arguments for marimo"""
+        args = super().get_args()
+
+        # Add marimo-specific arguments
+        # Note: --base-url must NOT end with a trailing slash
+        args.extend([
+            '--headless',
+            '--host', '0.0.0.0',
+            '--port', str(self.port),
+            '--no-token',
+            '--base-url', f'/user/{self.user.name}',
+            '.',
+        ])
+
+        return args
+
     async def start(self):
         # Ensure user exists
         self.ensure_user_exists()
-        
+
         # Ensure log dir
         os.makedirs("/var/log/jupyterhub/users", exist_ok=True)
 
-        # If front-end passed a target Marimo notebook, set the default URL to open it in JupyterLab
-        if self.marimo_file:
-            path = pathlib.Path(self.marimo_file)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            if not path.exists():
-                path.write_text("import marimo as mo\napp = mo.App()\n")
+        # Ensure user's apps directory exists
+        username = self.user.name
+        user_home = self._user_home(username)
+        apps_dir = user_home / "apps"
+        apps_dir.mkdir(parents=True, exist_ok=True)
 
-            # Construct URL to open the file in JupyterLab
-            file_path_relative = str(path.relative_to(self._user_home(self.user.name)))
-            self.default_url = f"/lab/tree/{file_path_relative}"
-            
-            print(f"DEBUG: Setting default URL to open in JupyterLab: {self.default_url}")
+        # Create a default welcome file if no documents exist
+        welcome_file = apps_dir / "welcome.py"
+        if not welcome_file.exists():
+            welcome_file.write_text('''import marimo as mo
 
-        else:
-            # fallback to regular JupyterLab home
-            self.default_url = "/lab"
+app = mo.App()
+
+@app.cell
+def __():
+    import marimo as mo
+    return mo,
+
+@app.cell
+def __(mo):
+    mo.md("# Welcome to Marimo!")
+    return
+
+@app.cell
+def __(mo):
+    mo.md("""
+    ## Getting Started
+
+    This is your Marimo server. You can:
+    - Create new documents from the dashboard
+    - Edit Python files as interactive notebooks
+    - Share your work with others
+    """)
+    return
+
+if __name__ == "__main__":
+    app.run()
+''')
+            welcome_file.chmod(0o644)
+
+        # Set the working directory to the apps folder
+        self.notebook_dir = str(apps_dir)
+
+        # Set default URL to root - marimo will show file browser
+        self.default_url = "/"
+
+        # Configure environment for the spawned process
+        self.environment = {
+            'MARIMO_BASE_URL': f'/user/{username}/',
+        }
+
+        print(f"DEBUG: Starting Marimo server for user {username}")
+        print(f"DEBUG: Working directory: {apps_dir}")
+        print(f"DEBUG: Base URL: /user/{username}/")
+        print(f"DEBUG: Port: {self.port}")
 
         # now start the real single-user server that JupyterHub manages
         return await super().start()
@@ -139,7 +195,7 @@ c.JupyterHub.port = 8000
 
 # Spawner configuration
 c.JupyterHub.spawner_class = MarimoSpawner
-c.Spawner.default_url = '/'
+c.Spawner.default_url = '/user/{username}/'
 
 # Get API token from environment
 _service_token = os.environ.get('HUB_API_TOKEN', new_token())
@@ -184,8 +240,11 @@ c.JupyterHub.load_roles = [
     }
 ]
 
-# Use conda Python for everything
-c.Spawner.cmd = ['/opt/conda/bin/jupyter-labhub']
+# Use Marimo - arguments are set in MarimoSpawner.get_args()
+c.Spawner.cmd = [
+    '/opt/conda/bin/marimo',
+    'edit',
+]
 c.LocalProcessSpawner.shell_cmd = ['/bin/bash', '-l', '-c']
 
 # Allow all origins for development
@@ -207,8 +266,12 @@ c.Authenticator.admin_users = {'admin'}
 c.JupyterHub.admin_access = True
 
 # Increase timeout for spawning
-c.Spawner.start_timeout = 600
-c.Spawner.http_timeout = 300
+c.Spawner.start_timeout = 1200
+c.Spawner.http_timeout = 600
+c.Spawner.spawn_timeout = 1200  # Total time allowed for spawn process
+c.Spawner.ready_timeout = 600   # Time to wait for server to become ready after process start
 
+# Add these for better process management
+c.Spawner.poll_interval = 10  
 # Set spawner working directory
 c.Spawner.notebook_dir = '~'

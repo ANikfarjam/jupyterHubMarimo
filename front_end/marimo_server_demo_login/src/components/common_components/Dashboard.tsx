@@ -8,7 +8,7 @@ import {
   listDocuments,
   deleteDocument,
   getMyServers,
-  getUserServerStatus,
+  checkMyServersStatus,
 } from '../../../api/request_methods'
 
 import {
@@ -114,16 +114,32 @@ export default function Dashboard() {
       const token = await getToken();
       const response = await createJhubDocument({
         userToken: token,
-        documentName: `${name}`,
+        documentName: name, 
       });
       
-      if (response.data.ok) {
+      // Fix the response checking - handle both success and error cases properly
+      if (response && response.data && response.data.ok) {
         await refresh();
+        alert("Document created successfully!");
       } else {
-        alert("Failed to create document");
+        const errorMessage = response?.data?.message || "Unknown error";
+        alert("Failed to create document: " + errorMessage);
       }
-    } catch (error) {
-      alert("Failed to create document");
+    } catch (error: any) {
+      console.error("Create document error:", error);
+      
+      // Handle different error scenarios
+      if (error.response) {
+        // Server responded with error status
+        const errorMessage = error.response.data?.detail || error.response.data?.message || "Server error";
+        alert("Failed to create document: " + errorMessage);
+      } else if (error.request) {
+        // Request was made but no response received
+        alert("Failed to create document: No response from server");
+      } else {
+        // Something else happened
+        alert("Failed to create document: " + (error?.message || "Unknown error"));
+      }
     }
   };
 
@@ -149,7 +165,7 @@ export default function Dashboard() {
 
 
 
- 
+
   const handleSpawn = async () => {
     try {
       const token = await getToken();
@@ -162,13 +178,43 @@ export default function Dashboard() {
 
       if (res.data?.ok) {
         console.log("Spawn success:", res.data);
-        
+        const username = res.data.user;
+
         if (res.data.server_ready) {
           // Redirect to the server
-          alert(`Server spawned successfully for user: ${res.data.user}`);
+          alert(`Server spawned successfully for user: ${username}`);
           window.location.href = res.data.nextUrl;
         } else {
-          alert(`Server is starting for user: ${res.data.user}. Please wait a moment and try creating documents.`);
+          // Server is starting, poll for status
+          alert(`Server is starting for user: ${username}. Please wait...`);
+
+          // Poll server status every 3 seconds
+          const pollInterval = setInterval(async () => {
+            try {
+              const statusRes = await checkMyServersStatus({
+                userToken: token,
+              });
+
+              console.log("Polling server status:", statusRes.data);
+
+              if (statusRes.data?.ok && statusRes.data?.has_running_servers) {
+                clearInterval(pollInterval);
+                alert(`Server is now ready for user: ${username}!`);
+
+                // Get the server URL from running servers
+                const serverUrl = statusRes.data.running_servers?.[0]?.url || `/hub/user/${username}/`;
+                window.location.href = serverUrl;
+              }
+            } catch (pollError) {
+              console.error("Error polling server status:", pollError);
+            }
+          }, 3000);
+
+          // Stop polling after 2 minutes (timeout)
+          setTimeout(() => {
+            clearInterval(pollInterval);
+            console.log("Server spawn timeout - stopped polling");
+          }, 120000);
         }
       } else {
         console.error("Spawn failed:", res.data?.message);
@@ -177,7 +223,7 @@ export default function Dashboard() {
 
     } catch (error: any) {
       console.error("Spawn failed:", error);
-      
+
       if (error.response?.status === 401) {
         alert("Authentication failed. Please log in again.");
         await loginWithRedirect({
