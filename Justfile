@@ -1,7 +1,7 @@
 #sh
 config:
     docker-compose down
-    docker compose build --no-cache hub
+    docker compose build hub
     docker compose up -d
 
 #sh    

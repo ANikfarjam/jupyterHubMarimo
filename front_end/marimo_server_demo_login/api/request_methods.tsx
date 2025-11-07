@@ -37,7 +37,7 @@ export const spawnServer = (
     });
 };
 
-// For creating documents (uses /documents endpoint with Form data)
+// For creating documents (uses /documents endpoint with query parameter)
 export const createJhubDocument = (
     options: BaseRequestOptions & {
         documentName: string;
@@ -49,24 +49,20 @@ export const createJhubDocument = (
     console.log("Making CREATE DOCUMENT request to: http://localhost:9000/documents");
     console.log("Document name:", documentName);
 
-    // Use URLSearchParams for application/x-www-form-urlencoded
-    const formData = new URLSearchParams();
-    formData.append("document_name", documentName);
-
     const headers = {
         ...(rest.headers ?? {}),
         Authorization: `Bearer ${userToken}`,
-        "Content-Type": "application/x-www-form-urlencoded",
     };
 
     console.log("Headers:", headers);
-    console.log("Form data:", formData.toString());
+
+    // Encode the document name and append to URL as query parameter
+    const url = `/documents?document_name=${encodeURIComponent(documentName)}`;
 
     return usedClient.post({
         ...rest,
-        url: "/documents",
+        url,
         headers,
-        data: formData,
     });
 };
 

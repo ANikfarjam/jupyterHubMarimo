@@ -9,7 +9,7 @@ import requests
 import httpx
 import jwt
 from jose import JWTError, jwt
-from fastapi import FastAPI, Header, HTTPException, Depends, Form
+from fastapi import FastAPI, Header, HTTPException, Depends, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer
@@ -556,12 +556,12 @@ async def create_user(authorization: Optional[str] = Header(None)):
 
 @app.post("/documents")
 async def create_document(
-    document_name: str = Form(...),
+    document_name: str = Query(...),
     authorization: Optional[str] = Header(None)
 ):
     """Create a new Marimo document - requires running server"""
     print("DEBUG: /documents endpoint called")
-    print(f"DEBUG: Received document_name form field: {document_name}")
+    print(f"DEBUG: Received document_name query parameter: {document_name}")
     print(f"DEBUG: Authorization header: {authorization[:50] if authorization else 'None'}...")
 
     if not authorization or not authorization.lower().startswith("bearer "):

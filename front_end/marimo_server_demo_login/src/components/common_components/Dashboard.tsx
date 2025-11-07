@@ -22,6 +22,7 @@ import {
   TableCaption,
 }from "@/components/ui/table";
 import ServersDataTable from "./DataTable";
+import { DocumentsDataTable } from "./DataTable";
 
 type MarimoDocument = { filename: string };
 // Shape returned by the listDocuments API
@@ -291,7 +292,12 @@ export default function Dashboard() {
         </div>
       </header>
       <div>
+        <h1>Servers</h1>
         <ServersDataTable></ServersDataTable>
+      </div>
+      <div>
+        <h1>Documents</h1>
+        <DocumentsDataTable></DocumentsDataTable>
       </div>
 
     </div>
