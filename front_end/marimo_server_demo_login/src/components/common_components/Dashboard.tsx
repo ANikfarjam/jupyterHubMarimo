@@ -9,6 +9,7 @@ import {
   deleteDocument,
   getMyServers,
   checkMyServersStatus,
+  JUPYTERHUB_URL,
 } from '../../../api/request_methods'
 
 import {
@@ -182,9 +183,9 @@ export default function Dashboard() {
         const username = res.data.user;
 
         if (res.data.server_ready) {
-          // Redirect to the server
+          // Redirect to the server with absolute URL
           alert(`Server spawned successfully for user: ${username}`);
-          window.location.href = res.data.nextUrl;
+          window.location.href = `${JUPYTERHUB_URL}${res.data.nextUrl}`;
         } else {
           // Server is starting, poll for status
           alert(`Server is starting for user: ${username}. Please wait...`);
@@ -202,9 +203,9 @@ export default function Dashboard() {
                 clearInterval(pollInterval);
                 alert(`Server is now ready for user: ${username}!`);
 
-                // Get the server URL from running servers
+                // Get the server URL from running servers and construct absolute URL
                 const serverUrl = statusRes.data.running_servers?.[0]?.url || `/hub/user/${username}/`;
-                window.location.href = serverUrl;
+                window.location.href = `${JUPYTERHUB_URL}${serverUrl}`;
               }
             } catch (pollError) {
               console.error("Error polling server status:", pollError);

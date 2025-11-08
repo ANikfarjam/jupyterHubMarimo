@@ -12,6 +12,7 @@ export type spawnResponse = {
 export type DocumentInfo = {
   name: string;
   path: string;
+  relative_path: string;  // Path relative to user home directory (e.g., "apps/notebook.py")
   size: number;
   modified: number;
 }

@@ -34,7 +34,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { getMyServers, checkMyServersStatus, listDocuments } from "../../../api/request_methods"
+import { getMyServers, checkMyServersStatus, listDocuments, JUPYTERHUB_URL } from "../../../api/request_methods"
 import { useAuth0 } from "@auth0/auth0-react"
 import type { ServerInfo, MyServersStatusResponse, DocumentInfo, ListDocumentsResponse } from "../../../api/types"
 
@@ -163,7 +163,11 @@ export default function ServersDataTable() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => window.open(server.url, '_blank')}
+                onClick={() => {
+                  // Construct absolute URL to JupyterHub server
+                  const absoluteUrl = `${JUPYTERHUB_URL}${server.url}`
+                  window.open(absoluteUrl, '_blank')
+                }}
               >
                 <Play className="h-4 w-4 mr-1" />
                 Open
@@ -466,12 +470,17 @@ export function DocumentsDataTable() {
               disabled={!hasRunningServer}
               onClick={() => {
                 if (serverUrl) {
-                  // Open the document in the user's running marimo server
-                  const marimoUrl = `${serverUrl}/?file=${encodeURIComponent(document.path)}`
+                  // Open the marimo notebook in edit mode on the spawned JupyterHub server
+                  // Ensure the server URL ends with a slash for proper routing through JupyterHub proxy
+                  const normalizedServerUrl = serverUrl.endsWith('/') ? serverUrl : `${serverUrl}/`
+
+                  // Use the absolute path to ensure marimo can find the file
+                  // Marimo accepts the file path via the ?file= query parameter
+                  const marimoUrl = `${JUPYTERHUB_URL}${normalizedServerUrl}?file=${encodeURIComponent(document.path)}`
                   window.open(marimoUrl, '_blank')
                 }
               }}
-              title={hasRunningServer ? "Open document in marimo" : "No running server available"}
+              title={hasRunningServer ? "Open marimo notebook" : "No running server available"}
             >
               <Play className="h-4 w-4 mr-1" />
               Open

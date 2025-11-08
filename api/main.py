@@ -629,9 +629,14 @@ async def list_documents(authorization: Optional[str] = Header(None)):
         if apps_dir.exists():
             for file_path in apps_dir.iterdir():
                 if file_path.is_file() and file_path.suffix == '.py':
+                    # Compute relative path from user home directory
+                    user_home = pathlib.Path(FILES_ROOT) / username
+                    relative_path = file_path.relative_to(user_home)
+
                     documents.append({
                         "name": file_path.name,
                         "path": str(file_path),
+                        "relative_path": str(relative_path),  # e.g., "apps/my_notebook.py"
                         "size": file_path.stat().st_size,
                         "modified": file_path.stat().st_mtime
                     })

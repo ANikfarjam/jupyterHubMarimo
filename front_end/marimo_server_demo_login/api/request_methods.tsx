@@ -11,6 +11,9 @@ export const client = createClient(createConfig(
   {baseURL: "http://localhost:9000"},
 ));
 
+// JupyterHub URL where marimo servers run (different from API service)
+export const JUPYTERHUB_URL = "http://localhost:8000";
+
 // Base request options for client calls (do NOT mix in response shape)
 // Keep this independent from the response generic so callers can pass only
 // request-related properties (headers, params, etc.) plus `userToken`.
