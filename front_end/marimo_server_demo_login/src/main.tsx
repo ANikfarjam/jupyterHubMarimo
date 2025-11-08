@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client';
 import { Auth0Provider } from "@auth0/auth0-react";
 import './index.css';
 import App from './App.tsx';
+import Dashboard from './components/common_components/Dashboard.tsx';
 
 const container = document.getElementById('root');
 if (!container) throw new Error('Root container missing in index.html');
@@ -13,13 +14,15 @@ const audience = import.meta.env.VITE_AUTH0_AUDIENCE as string;
 const root = createRoot(container);
 root.render(
   <Auth0Provider
-    domain={domain}
-    clientId={clientId}
+    domain={domain || "dev-mtmjc4rwzjq4eryf.us.auth0.com"}
+    clientId={clientId || "JGn9DHgfMZSCuANjjiHH8dGA3d9ZnFiW"}
     authorizationParams={{
-      redirect_uri: `${window.location.origin}/dashboard`,
-      audience: audience,
+      redirect_uri: 'http://localhost:5173/dashboard', 
+      audience: audience || "https://dev-mtmjc4rwzjq4eryf.us.auth0.com/api/v2/",
       scope: "read:current_user update:current_user_metadata"
     }}
+    cacheLocation="localstorage" 
+    useRefreshTokens={true} 
   >
     <App />
   </Auth0Provider>
